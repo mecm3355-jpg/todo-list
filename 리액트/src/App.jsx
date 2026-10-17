@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
-const API_ROOT = import.meta.env.VITE_API_ROOT || `http://${window.location.hostname}:5000`
+const API_ROOT = import.meta.env.VITE_API_ROOT || '/api'
 const API_URL = import.meta.env.VITE_API_URL || `${API_ROOT}/todos`
 const AUTH_URL = `${API_ROOT}/auth`
 
@@ -45,7 +45,7 @@ async function request(url = API_URL, options = {}) {
     })
   } catch (cause) {
     const error = new Error(
-      '백엔드 서버에 연결할 수 없습니다. localhost:5000 서버를 확인해 주세요.',
+      '백엔드 API에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.',
       { cause },
     )
     error.isConnectionError = true

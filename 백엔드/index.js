@@ -6,7 +6,6 @@ require("dotenv").config({
 });
 
 const express = require("express");
-const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const mongoose = require("mongoose");
 const Todo = require("./models/todo");
@@ -16,60 +15,71 @@ const todoRouter = require("./routes/todoRouter");
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
-const MONGODB_URI = process.env.MONGODB_URI;
-const allowedOrigins = (
-  process.env.FRONTEND_ORIGINS ||
-  "http://localhost:5173,http://127.0.0.1:5173"
-)
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+let connectionPromise;
 
-if (!MONGODB_URI) {
-  console.error("MONGODB_URI가 없습니다. .env 파일을 확인해 주세요.");
-  process.exit(1);
+async function connectToDatabase() {
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+
+  if (!process.env.MONGODB_URI) {
+    throw new Error("MONGODB_URI 환경 변수가 없습니다.");
+  }
+
+  if (!connectionPromise) {
+    connectionPromise = mongoose
+      .connect(process.env.MONGODB_URI)
+      .then(async (connection) => {
+        await Promise.all([User.init(), Todo.init()]);
+        return connection;
+      })
+      .catch((error) => {
+        connectionPromise = undefined;
+        throw error;
+      });
+  }
+
+  return connectionPromise;
 }
 
-if (!process.env.JWT_SECRET) {
-  console.error("JWT_SECRET이 없습니다. .env 파일을 확인해 주세요.");
-  process.exit(1);
-}
-
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error("허용되지 않은 프론트엔드 주소입니다."));
-    },
-    credentials: true,
-  }),
-);
 app.use(express.json());
 app.use(cookieParser());
-app.use("/auth", authRouter);
-app.use("/todos", todoRouter);
 
-app.get("/", (req, res) => {
-  res.send("서버가 정상적으로 실행 중입니다.");
+app.use("/api", async (req, res, next) => {
+  if (!process.env.JWT_SECRET) {
+    return res.status(500).json({ message: "JWT_SECRET 환경 변수가 없습니다." });
+  }
+
+  try {
+    await connectToDatabase();
+    return next();
+  } catch (error) {
+    console.error("MongoDB 연결 실패:", error.message);
+    return res.status(503).json({ message: "데이터베이스에 연결하지 못했습니다." });
+  }
+});
+
+app.use("/api/auth", authRouter);
+app.use("/api/todos", todoRouter);
+
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
 });
 
 async function startServer() {
   try {
-    await mongoose.connect(MONGODB_URI);
-    await User.init();
-    await Todo.init();
-    console.log("몽고디비 연결 성공");
-
+    await connectToDatabase();
     app.listen(PORT, () => {
       console.log(`서버가 ${PORT}번 포트에서 실행 중입니다.`);
     });
   } catch (error) {
-    console.error("몽고디비 연결 실패:", error.message);
+    console.error("서버 시작 실패:", error.message);
     process.exit(1);
   }
 }
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = app;

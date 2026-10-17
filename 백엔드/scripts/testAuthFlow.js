@@ -24,7 +24,7 @@ async function run() {
   let accountCreated = false;
 
   try {
-    const signup = await api("/auth/signup", {
+    const signup = await api("/api/auth/signup", {
       method: "POST",
       body: JSON.stringify({
         name: "인증 테스트",
@@ -37,23 +37,23 @@ async function run() {
     assert.match(cookie, /^todo_auth=/);
     accountCreated = true;
 
-    const me = await api("/auth/me");
+    const me = await api("/api/auth/me");
     assert.equal(me.response.status, 200);
     assert.equal(me.data.user.email, email);
 
-    const created = await api("/todos", {
+    const created = await api("/api/todos", {
       method: "POST",
       body: JSON.stringify({ content: "인증 통합 테스트", priority: "high" }),
     });
     assert.equal(created.response.status, 201);
     assert.equal(created.data.content, "인증 통합 테스트");
 
-    const list = await api("/todos");
+    const list = await api("/api/todos");
     assert.equal(list.response.status, 200);
     assert.equal(list.data.length, 1);
     assert.equal(list.data[0]._id, created.data._id);
 
-    const updated = await api(`/todos/${created.data._id}`, {
+    const updated = await api(`/api/todos/${created.data._id}`, {
       method: "PUT",
       body: JSON.stringify({
         content: "수정된 인증 통합 테스트",
@@ -64,23 +64,23 @@ async function run() {
     assert.equal(updated.response.status, 200);
     assert.equal(updated.data.completed, true);
 
-    const deleted = await api(`/todos/${created.data._id}`, { method: "DELETE" });
+    const deleted = await api(`/api/todos/${created.data._id}`, { method: "DELETE" });
     assert.equal(deleted.response.status, 200);
 
-    const withdrawal = await api("/auth/me", {
+    const withdrawal = await api("/api/auth/me", {
       method: "DELETE",
       body: JSON.stringify({ password }),
     });
     assert.equal(withdrawal.response.status, 200);
     accountCreated = false;
 
-    const unauthorized = await api("/todos");
+    const unauthorized = await api("/api/todos");
     assert.equal(unauthorized.response.status, 401);
 
     console.log("회원가입, 인증, Todo CRUD, 회원탈퇴 통합 테스트 통과");
   } finally {
     if (accountCreated) {
-      await api("/auth/me", {
+      await api("/api/auth/me", {
         method: "DELETE",
         body: JSON.stringify({ password }),
       }).catch(() => {});
